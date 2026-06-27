@@ -33,26 +33,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Handle the result from a Google redirect sign-in on page load
-    getRedirectResult(auth).catch(() => {
-      // Silently ignore — no redirect result is normal on fresh page loads
-    });
+    let unsubscribe: () => void;
 
-    const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      setUser(u);
-      setLoading(false);
-
-      if (u) {
-        // Sync user profile to Firestore
-        await syncUserToFirestore({
-          uid: u.uid,
-          email: u.email,
-          displayName: u.displayName,
-          photoURL: u.photoURL,
-        });
+    const init = async () => {
+      // Await the redirect result FIRST so that when onAuthStateChanged fires,
+      // Firebase already has the user session from the Google redirect.
+      try {
+        await getRedirectResult(auth);
+      } catch {
+        // No redirect result — normal on fresh page loads, ignore.
       }
-    });
-    return () => unsubscribe();
+
+      // Now subscribe. Firebase will immediately emit the current user (or null).
+      unsubscribe = onAuthStateChanged(auth, async (u) => {
+        setUser(u);
+        setLoading(false);
+
+        if (u) {
+          await syncUserToFirestore({
+            uid: u.uid,
+            email: u.email,
+            displayName: u.displayName,
+            photoURL: u.photoURL,
+          });
+        }
+      });
+    };
+
+    init();
+    return () => unsubscribe?.();
   }, []);
 
   const signInWithGoogle = async () => {

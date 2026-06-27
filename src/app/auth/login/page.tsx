@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -12,8 +12,16 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { signInEmail, signInWithGoogle } = useAuth();
+  const { signInEmail, signInWithGoogle, user, loading } = useAuth();
   const router = useRouter();
+
+  // After a Google redirect sign-in, Firebase resolves the user here.
+  // Redirect to home as soon as the user is available.
+  useEffect(() => {
+    if (!loading && user) {
+      router.push('/');
+    }
+  }, [user, loading, router]);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
