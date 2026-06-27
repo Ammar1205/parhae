@@ -3,7 +3,9 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import {
   User,
+  signInWithRedirect,
   signInWithPopup,
+  getRedirectResult,
   GoogleAuthProvider,
   signOut,
   onAuthStateChanged,
@@ -31,10 +33,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Handle the result from a Google redirect sign-in on page load
+    getRedirectResult(auth).catch(() => {
+      // Silently ignore — no redirect result is normal on fresh page loads
+    });
+
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       setUser(u);
       setLoading(false);
-      
+
       if (u) {
         // Sync user profile to Firestore
         await syncUserToFirestore({
@@ -50,7 +57,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
+    // Use redirect on production (avoids popup-blocked errors on deployed sites).
+    // Fall back to popup only on localhost for a smoother dev experience.
+    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+      await signInWithPopup(auth, provider);
+    } else {
+      await signInWithRedirect(auth, provider);
+    }
   };
 
   const signInEmail = async (email: string, password: string) => {
