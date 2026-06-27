@@ -66,12 +66,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
-    // Use redirect on production (avoids popup-blocked errors on deployed sites).
-    // Fall back to popup only on localhost for a smoother dev experience.
-    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+    try {
+      // Try popup first — it works on localhost and most desktop browsers.
       await signInWithPopup(auth, provider);
-    } else {
-      await signInWithRedirect(auth, provider);
+    } catch (err: any) {
+      // Only fall back to redirect if the popup was explicitly blocked by the browser.
+      // This avoids the cross-site cookie issue that breaks signInWithRedirect
+      // when Firebase uses firebaseapp.com as the intermediary domain.
+      if (err?.code === 'auth/popup-blocked') {
+        await signInWithRedirect(auth, provider);
+      } else {
+        throw err;
+      }
     }
   };
 
